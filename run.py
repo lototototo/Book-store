@@ -1,3 +1,5 @@
+from http.cookiejar import debug
+
 from flask import Flask
 
 from config import settings
@@ -8,4 +10,4 @@ app.config['SECRET_KEY'] = settings.SECRET_KEY
 
 if __name__ == '__main__':
     init_db()
-    app.run(port=5466)
+    app.run(port=5466, debug=True)
