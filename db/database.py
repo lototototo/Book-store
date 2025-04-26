@@ -1,13 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-from db.models import Base
+from db.models import Base, User
 
 from contextlib import contextmanager
 
 from config import settings
 
 engine = create_engine(url=settings.DATABASE_URL)
-SessionLocal = scoped_session(session_factory=sessionmaker(autocommit=False))
+SessionLocal = scoped_session(sessionmaker(autocommit=False, bind=engine))
 
 def init_db():
     Base.metadata.create_all(bind=engine)

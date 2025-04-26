@@ -1,56 +1,83 @@
-import email
-from click import confirm
-from flask import Blueprint, flash, redirect, url_for, render_template
-from flask_wtf import FlaskForm
-from unicodedata import category
-from wtforms import PasswordField, StringField
-from wtforms,validators import Email, EqualTo, InputRequired, Length
+from flask import Blueprint, flash, redirect, url_for, render_template, request, jsonify
+from pydantic import BaseModel, EmailStr, Field, ValidationError
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from db.database import session_scope
 from db.models import User
-from werkzeug.security import generate_password_hash, check_password_hash
 
 main_blueprint = Blueprint(name='main', import_name=__name__)
 
-class RegistrationForm(FlaskForm):
-    username = StringField(label='Username', validators=[InputRequired(), Length(max=100, min=4)])
-    email = StringField(label='Email', validators=[InputRequired(),Email()])
-    password = PasswordField(label='Password', validators=[InputRequired(), Length(max=36, min=8)])
-    confirm_password = PasswordField(label='Confirm Password', validators=[InputRequired(), EqualTo(fieldname='password')])
+# Pydantic-схема для регистрации
+class RegistrationData(BaseModel):
+    username: str = Field(..., min_length=4, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=36)
+    confirm_password: str
 
-@main_blueprint.route(rule='/register', methods=['GET', 'POST'])
+    def validate_passwords(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+
+@main_blueprint.route(rule='/register', methods=['POST'])
 def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        with session_scope() as session:
-            user = session.query(_entity=User).filter_by(email=form.email.data).first()
-        if user:
-            flash(message='User with this email already exists', category='danger')
-            return redirect(location=url_for(endpoint='main.register', form=form))
+    try:
+        # Получаем JSON-данные из тела запроса
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
 
-        user = User(
-            username=form.username.data,
-            email=form.email.data,
-            password_hash=generate_password_hash(passwod=form.password.data)
-        )
+        # Валидируем данные через Pydantic
+        registration_data = RegistrationData(**data)
+        registration_data.validate_passwords()
+
         with session_scope() as session:
-            session.add(instance=user)
-        return redirect(location=url_for(endpoint='main.login'))
-    elif form.errors:
-        flash(message=form.errors, category='danger')
-    return render_template(template_name_or_list='register.html',form=form)
+            user = session.query(User).filter_by(email=registration_data.email).first()
+            if user:
+                return jsonify({"error": "User with this email already exists"}), 400
+
+            # Создаем нового пользователя
+            user = User(
+                username=registration_data.username,
+                email=registration_data.email,
+                password_hash=generate_password_hash(registration_data.password)
+            )
+            session.add(user)
+
+        return jsonify({"message": "User registered successfully"}), 201
+
+    except ValidationError as e:
+        # Возвращаем ошибки валидации
+        return jsonify({"errors": e.errors()}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+@main_blueprint.route(rule='/login', methods=['POST'])
+def login():
+    try:
+        # Pydantic-схема для логина
+        class LoginData(BaseModel):
+            email: EmailStr
+            password: str
+
+        # Получаем JSON-данные из тела запроса
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+
+        # Валидируем данные через Pydantic
+        login_data = LoginData(**data)
+
+        with session_scope() as session:
+            user = session.query(User).filter_by(email=login_data.email).first()
+            if user and check_password_hash(user.password_hash, login_data.password):
+                # Здесь можно добавить логику для создания сессии пользователя
+                return jsonify({"message": "Login successful"}), 200
+            else:
+                return jsonify({"error": "Invalid email or password"}), 401
+
+    except ValidationError as e:
+        return jsonify({"errors": e.errors()}), 400
 
 @main_blueprint.route(rule='/main')
 def main_route():
     return render_template(template_name_or_list='home.html')
-
-@main_blueprint.route(rule='/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        with session_scope() as session:
-            user = session.query(_entity=User).filter_by(email=form.email.data).first()
-            if user and check_password_hash(pwhash=user.password_hash, password=form.password.data):
-                login_user(user=user)
-                return redirect(locarion='main.home')
-    return render_template(template_name_or_list='login.html',form=form)

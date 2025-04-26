@@ -12,4 +12,4 @@ class User(Base, UserMixin):
     id = Column(Integer, primary_key=True)
     username = Column(String(length=80), unique=True)
     email = Column(String(length=80), unique=True)
-    password_hash = Column(String(length=80))
+    password_hash = Column(String(length=255))
