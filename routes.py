@@ -10,11 +10,13 @@ main_blueprint = Blueprint(name='main', import_name=__name__)
 # Настройка Flask-Login
 login_manager = LoginManager()
 
-
 @login_manager.user_loader
 def load_user(user_id):
     with session_scope() as session:
-        return session.query(User).get(int(user_id))
+        user = session.query(User).get(int(user_id))
+        if user:
+            session.expunge(user)  # Отсоединяем объект от сессии
+        return user
 
 # Pydantic-схема для регистрации
 class RegistrationData(BaseModel):
@@ -45,9 +47,15 @@ def register():
         registration_data.validate_passwords()
 
         with session_scope() as session:
+            # Проверяем, существует ли пользователь с таким email
             user = session.query(User).filter_by(email=registration_data.email).first()
             if user:
                 return jsonify({"error": "User with this email already exists"}), 400
+
+            # Проверяем, существует ли пользователь с таким username
+            user = session.query(User).filter_by(username=registration_data.username).first()
+            if user:
+                return jsonify({"error": "User with this username already exists"}), 400
 
             # Создаем нового пользователя
             user = User(
