@@ -30,7 +30,7 @@ jobs:
           # Переходим в директорию приложения
           cd book_store || exit
           # Обновляем репозиторий
-          git pull origin main
+          git pull origin master
           # Строим и запускаем контейнеры
           docker compose down
           docker compose up -d --build
