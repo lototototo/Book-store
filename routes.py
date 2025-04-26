@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, url_for, render_template
 from flask_wtf import FlaskForm
 from unicodedata import category
 from wtforms import PasswordField, StringField
-from wtforms,validators import Email, EqualTo, InputRequired, Length
+from wtforms.validators import Email, EqualTo, InputRequired, Length
 
 from db.database import session_scope
 from db.models import User
