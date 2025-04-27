@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flask_app
+    ports:
+      - "5000:5000"  # Пробрасываем порт 5000
+    volumes:
+      - .:/app  # Монтируем локальные файлы для разработки
+    environment:
+      - DATABASE_URL=sqlite:///database.db  # Пример переменной окружения
+    restart: always
